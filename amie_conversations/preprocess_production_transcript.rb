@@ -64,7 +64,8 @@ class ProductionTranscriptPreprocessor
   def write_markdown(row)
     id = fetch_required(row, id_column)
     response = JSON.parse(fetch_required(row, response_column))
-    path = File.join(output_dir, "#{safe_filename(id)}.md")
+    epoch = Time.parse(fetch_required(row, "created_at")).utc.to_i
+    path = File.join(output_dir, "#{epoch}_#{safe_filename(id)}.md")
 
     File.write(path, markdown_for(row, response), mode: "w", encoding: "UTF-8")
   end

@@ -13,7 +13,7 @@ New conversations are continually prepended to `production-transcript.csv`. Each
 
 New output filenames: `<epoch>_<id>.md`
 
-- Epoch = `created_at` column parsed as UTC → Unix seconds (integer)
+- Epoch = `created_at` column parsed via `Time.parse(created_at).utc.to_i` (requires `require "time"`). **Do not use `Time.iso8601`** — the CSV format (`2026-05-07 22:38:36.694+00`) uses a space separator and `+00` offset that `iso8601` rejects, causing an `ArgumentError` on every row.
 - Example: `1746657516_9e51c126-3854-4533-be0e-e06679baf410.md`
 - Files sort chronologically by name in any file browser or `ls`
 
@@ -23,7 +23,9 @@ Before touching the CSV, scan `output_dir` for `*.md` files. Extract the UUID fr
 
 Supports both naming styles during migration:
 - Old: `<id>.md` → ID = basename without `.md`
-- New: `<epoch>_<id>.md` → ID = part after first `_`, without `.md`
+- New: `<epoch>_<id>.md` → ID = `filename.split('_', 2)[1]` stripped of `.md` (epoch is a plain integer — no underscores — so split on first `_` is unambiguous)
+
+**Constraint:** IDs in the CSV are UUIDs (hex digits and hyphens only, no underscores). The `<digits>_` epoch prefix is therefore an unambiguous separator.
 
 Empty folder → empty set → process everything.
 
@@ -46,11 +48,11 @@ Existing per-row `rescue JSON::ParserError, KeyError, ArgumentError` is preserve
 
 ### 5. Output Summary
 
-Three existing lines preserved. New fourth line:
+Add `early_exit_id` (nilable) to the `Result` struct. Set it to the matched row's id when breaking. The CLI section checks `result.early_exit_id` and prints the appropriate fourth line:
 
 ```
-Stopped at already-processed id <id>   # if early exit triggered
-Reached end of CSV                     # if full file consumed
+Stopped at already-processed id <id>   # if result.early_exit_id is set
+Reached end of CSV                     # if result.early_exit_id is nil
 ```
 
 ## Migration
@@ -69,3 +71,4 @@ No code change needed for migration; the script handles an empty folder on first
 - **Stop-on-known-ID skips back-fills.** If a previously-pending row is later completed and sits above a known ID in the CSV, it will never be processed. Acceptable per the prepend-only contract.
 - **`created_at` parse error** is non-fatal: the row is skipped with an error entry, not a crash.
 - **Set lookup is O(1)** — no performance concern even with thousands of files.
+- **Requires `require "set"` and `require "time"`** — neither is in the current script.

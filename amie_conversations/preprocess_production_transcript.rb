@@ -53,7 +53,7 @@ class ProductionTranscriptPreprocessor
       errors << "#{row[id_column] || "unknown"}: #{e.class}: #{e.message}"
     end
 
-    Result.new(files_written:, rows_skipped:, errors:)
+    Result.new(files_written:, rows_skipped:, errors:, early_exit_id: nil)
   end
 
   private

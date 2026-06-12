@@ -40,8 +40,17 @@ class ProductionTranscriptPreprocessor
     files_written = 0
     rows_skipped = 0
     errors = []
+    early_exit_id = nil
+    seen = processed_ids
 
     CSV.foreach(input_path, headers: true) do |row|
+      row_id = row[id_column]
+
+      if seen.include?(row_id)
+        early_exit_id = row_id
+        break
+      end
+
       unless row[status_column] == completed_status
         rows_skipped += 1
         next
@@ -50,10 +59,10 @@ class ProductionTranscriptPreprocessor
       write_markdown(row)
       files_written += 1
     rescue JSON::ParserError, KeyError, ArgumentError => e
-      errors << "#{row[id_column] || "unknown"}: #{e.class}: #{e.message}"
+      errors << "#{row_id || "unknown"}: #{e.class}: #{e.message}"
     end
 
-    Result.new(files_written:, rows_skipped:, errors:, early_exit_id: nil)
+    Result.new(files_written:, rows_skipped:, errors:, early_exit_id:)
   end
 
   private

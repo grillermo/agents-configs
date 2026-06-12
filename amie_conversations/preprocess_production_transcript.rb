@@ -8,7 +8,7 @@ require "set"
 require "time"
 
 class ProductionTranscriptPreprocessor
-  Result = Struct.new(:files_written, :rows_skipped, :errors, keyword_init: true)
+  Result = Struct.new(:files_written, :rows_skipped, :errors, :early_exit_id, keyword_init: true)
 
   NAME_POOL = %w[
     Alex Blair Casey Drew Ellis Finley Gray Harper Indy Jules Kai Logan Morgan

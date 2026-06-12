@@ -159,6 +159,16 @@ class ProductionTranscriptPreprocessor
     value.to_s.gsub(%r{[^\w.-]}, "_")
   end
 
+  def processed_ids
+    pattern = File.join(output_dir, "*.md")
+    Dir.glob(pattern).each_with_object(Set.new) do |path, set|
+      name = File.basename(path, ".md")
+      # Strip leading epoch prefix if present (integer prefix, no underscores)
+      id = name.match?(/\A\d+_/) ? name.split("_", 2)[1] : name
+      set.add(id)
+    end
+  end
+
   class SpeakerNames
     def initialize
       @names_by_id = {}

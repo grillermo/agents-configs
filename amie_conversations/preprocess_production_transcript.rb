@@ -207,6 +207,12 @@ if $PROGRAM_NAME == __FILE__
   puts "Wrote #{result.files_written} markdown files to #{output_dir}"
   puts "Skipped #{result.rows_skipped} non-COMPLETED rows"
 
+  if result.early_exit_id
+    puts "Stopped at already-processed id #{result.early_exit_id}"
+  else
+    puts "Reached end of CSV"
+  end
+
   unless result.errors.empty?
     warn "Encountered #{result.errors.size} errors:"
     result.errors.each { |error| warn "  #{error}" }

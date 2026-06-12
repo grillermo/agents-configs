@@ -1,5 +1,8 @@
 model = "gpt-5.5"
 model_reasoning_effort = "medium"
+service_tier = "default"
+notify = ["/Users/grillermo/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
+
 [projects."/Users/grillermo/c/auto-email-classifier"]
 trust_level = "trusted"
 
@@ -72,6 +75,39 @@ trust_level = "trusted"
 [projects."/Users/grillermo/c/agents-configs"]
 trust_level = "trusted"
 
+[projects."/Users/grillermo/c/starry-poster"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/readitsoon-companion"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/kimai-bar"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/auto-fix"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/.config/nvim"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/webstats"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/google drive personal/documentos/notas/Proyectos/antesis"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/pilou"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/pilou/db-analysis"]
+trust_level = "trusted"
+
+[projects."/Users/grillermo/c/pilou/pilou-bo-api"]
+trust_level = "trusted"
+
+[notice]
+hide_rate_limit_model_nudge = true
+
 [notice.model_migrations]
 "gpt-5.3-codex" = "gpt-5.4"
 
@@ -81,6 +117,13 @@ trust_level = "trusted"
 [tui.keymap.chat]
 increase_reasoning_effort = "ctrl-alt-right"
 decrease_reasoning_effort = "ctrl-alt-left"
+
+[tui.keymap.global]
+toggle_fast_mode = ["ctrl-alt-up", "ctrl-alt-down"]
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["chrome-devtools-mcp@latest"]
 
 [mcp_servers.code-review-graph]
 command = "code-review-graph"
@@ -95,13 +138,27 @@ approval_mode = "approve"
 [mcp_servers.code-review-graph.tools.semantic_search_nodes_tool]
 approval_mode = "approve"
 
-[mcp_servers.chrome-devtools]
+[mcp_servers.context7]
 command = "npx"
-args = ["chrome-devtools-mcp@latest"]
+args = ["-y", "@upstash/context7-mcp", "--api-key", "ctx7sk-344a8c0c-4c03-4f41-b8be-3335f942871d"]
 
-[mcp_servers.informant]
-command = "/bin/zsh"
-args = ["-lc", "cd /Users/grillermo/c/rulinky && set -a && source ./.env && source ./.env.local && set +a && exec /Users/grillermo/.rbenv/versions/4.0.4/bin/bundle exec informant-mcp --allow-insecure"]
+[mcp_servers.node_repl]
+args = []
+command = "/Applications/Codex.app/Contents/Resources/node_repl"
+startup_timeout_sec = 120
+
+[mcp_servers.node_repl.env]
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = ""
+NODE_REPL_NODE_PATH = "/Applications/Codex.app/Contents/Resources/node"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/grillermo/.codex"
+CODEX_HOME = "/Users/grillermo/.codex"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "4b6bfaf4ed2ce9b5cd68e60a61642eb4927a36306ba8c8993f6058607b3530fb"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
+BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
+CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"
 
 [hooks.state]
 
@@ -120,6 +177,31 @@ trusted_hash = "sha256:137a3b0f873233b5868ecf922d68535ea5b44a346b92fdd64bcf5ff1f
 [hooks.state."/Users/grillermo/c/readitsoon/.codex/hooks.json:stop:0:0"]
 trusted_hash = "sha256:f399daeee5b98033c74549ca20f82b734f3160b2e625827d141ca8432755925f"
 
-[mcp_servers.cce-readitsoon-d7a872]
-command = "/Users/grillermo/.local/bin/cce"
-args = ["serve", "--project-dir", "/Users/grillermo/c/readitsoon"]
+[desktop]
+preventSleepWhileRunning = true
+keepRemoteControlAwakeWhilePluggedIn = true
+
+[marketplaces.openai-bundled]
+last_updated = "2026-06-03T21:44:40Z"
+source_type = "local"
+source = "/Users/grillermo/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-06-03T21:53:41Z"
+source_type = "local"
+source = "/Users/grillermo/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+
+[features]
+js_repl = false
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true

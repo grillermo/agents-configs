@@ -1,0 +1,30 @@
+/* overexplain — floating index (sticky TOC).
+   Requires these custom properties on the page: --card --rule --fg --muted --link
+   --accent --code-bg. Breakpoint assumes a ~78ch centered content column; if the
+   column is wider, raise it to (content width + 2 x 20rem) in both queries. */
+nav.toc{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:1.1rem 1.3rem;margin:0 0 2.5rem}
+nav.toc p{font-size:.75rem;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 .5rem}
+nav.toc ol{margin:0;padding-left:1.2rem}
+nav.toc li{margin:.22rem 0;font-size:.94rem}
+nav.toc a{text-decoration:none;color:var(--link)}
+nav.toc a:hover{text-decoration:underline}
+/* Float it only where there's gutter room; below this it stays an inline card. */
+@media (min-width:1240px){
+  nav.toc{
+    position:fixed; top:1.5rem; left:1.25rem; width:18rem; z-index:20;
+    max-height:calc(100vh - 3rem); overflow-y:auto; overscroll-behavior:contain;
+    margin:0; padding:1rem 1.1rem; font-size:.9rem;
+    box-shadow:0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+    scrollbar-width:thin;
+  }
+  nav.toc li{margin:0;font-size:.86rem;line-height:1.35}
+  nav.toc ol{padding-left:1.15rem}
+  nav.toc li::marker{color:var(--muted);font-size:.75rem}
+  nav.toc a{display:block;padding:.28rem .4rem;margin-left:-.4rem;border-radius:6px;color:var(--fg)}
+  nav.toc a:hover{background:var(--code-bg);text-decoration:none}
+  nav.toc a.active{background:var(--code-bg);color:var(--accent);font-weight:600;box-shadow:inset 2px 0 0 var(--accent)}
+  nav.toc li:has(a.active)::marker{color:var(--accent);font-weight:700}
+}
+@media (min-width:1240px) and (prefers-reduced-motion:no-preference){
+  nav.toc a{transition:background .15s ease,color .15s ease}
+}

@@ -42,4 +42,4 @@ tmp_name=$(basename -- "$tmp_file")
 canonical_tmp_file="$tmp_dir/$tmp_name"
 
 output=$("$SCRIPT" --dry-run "$tmp_file")
-assert_contains "shortcuts run Upload to S3 --input-path $canonical_tmp_file" "$output"
+assert_contains "shortcuts run Upload file --input-path $canonical_tmp_file" "$output"

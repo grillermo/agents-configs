@@ -1,12 +1,12 @@
 ---
 name: upload
-description: Upload a user-provided local file through the macOS "Upload to S3" Shortcut when the user invokes /upload or asks to upload a file to S3 with that Shortcut.
+description: Upload a user-provided local file through the macOS "Upload file" Shortcut when the user invokes /upload or asks to upload a file to S3 with that Shortcut.
 ---
 
 # Upload
 
 Use this skill when the user invokes `/upload {reference_to_file}` or explicitly asks to
-upload a local file through the macOS Shortcut named `Upload to S3`.
+upload a local file through the macOS Shortcut named `Upload file`.
 
 ## Workflow
 

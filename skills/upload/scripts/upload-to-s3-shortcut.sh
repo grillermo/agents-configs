@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-SHORTCUT_NAME="Upload to S3"
+SHORTCUT_NAME="Upload file"
 DRY_RUN=0
 
 usage() {

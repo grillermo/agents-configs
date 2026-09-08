@@ -16,7 +16,7 @@ upload a local file through the macOS Shortcut named `Upload file`.
 3. Run:
 
    ```sh
-   sh skills/upload/scripts/upload-to-s3-shortcut.sh "<file-path>"
+   sh skills/upload/scripts/upload-shortcut.sh "<file-path>"
    ```
 
 4. Report the Shortcut output if it prints one. If the Shortcut fails, include the

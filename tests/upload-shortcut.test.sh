@@ -2,7 +2,7 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-SCRIPT="$ROOT_DIR/skills/upload/scripts/upload-to-s3-shortcut.sh"
+SCRIPT="$ROOT_DIR/skills/upload/scripts/upload-shortcut.sh"
 
 assert_exit() {
   expected_status=$1

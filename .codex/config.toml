@@ -160,6 +160,12 @@ NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunct
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
 CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"
 
+[mcp_servers.stitch]
+url = "https://stitch.googleapis.com/mcp"
+# Key comes from STITCH_API_KEY in ~/.codex/.env, which Codex loads at startup.
+env_http_headers = { "X-Goog-Api-Key" = "STITCH_API_KEY" }
+
+
 [hooks.state]
 
 [hooks.state."/Users/grillermo/c/readitsoon/.codex/hooks.json:post_tool_use:0:0"]

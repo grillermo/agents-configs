@@ -242,6 +242,18 @@ class FileToS3McpTest < Minitest::Test
     assert_includes text(result), "mcp.html is reserved"
   end
 
+  def test_malformed_verify_response_is_a_tool_error
+    @routes["/auth/verify"] = ->(_) { [200, "not json at all"] }
+    response = mcp({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "file_to_s3_verify", arguments: { code: "123456" } } }).first
+
+    assert_equal 9, response["id"]
+    assert_nil response["error"]
+    result = response.fetch("result")
+    assert_equal true, result["isError"]
+    assert_includes text(result), "Unexpected response"
+    refute File.exist?(@token_file)
+  end
+
   def test_unreachable_server_is_a_tool_error
     logged_in
     @url = "http://127.0.0.1:1"

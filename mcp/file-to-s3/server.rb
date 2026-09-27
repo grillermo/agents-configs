@@ -77,7 +77,13 @@ module FileToS3Mcp
                          "If it expired, call file_to_s3_login for a new one."
       end
 
-      save_token(JSON.parse(response.body).fetch("token"))
+      token =
+        begin
+          JSON.parse(response.body).fetch("token")
+        rescue JSON::ParserError, KeyError => e
+          raise ToolError, "Unexpected response from #{@base_url}: #{e.class}: #{e.message}"
+        end
+      save_token(token)
       "Logged in to file_to_s3 as #{Socket.gethostname}. The token never expires."
     end
 
@@ -111,6 +117,8 @@ module FileToS3Mcp
       end
     rescue SocketError, SystemCallError, IOError, Timeout::Error, OpenSSL::SSL::SSLError => e
       raise ToolError, "Could not reach #{@base_url}: #{e.message}"
+    rescue Net::ProtocolError => e
+      raise ToolError, "Unexpected response from #{@base_url}: #{e.class}: #{e.message}"
     end
 
     def read_token
@@ -149,12 +157,17 @@ module FileToS3Mcp
     private
 
     def handle_line(line)
-      handle(JSON.parse(line))
-    rescue JSON::ParserError
-      error(nil, -32700, "Parse error")
+      begin
+        message = JSON.parse(line)
+      rescue JSON::ParserError
+        return error(nil, -32700, "Parse error")
+      end
+
+      id = message["id"] if message.is_a?(Hash)
+      handle(message)
     rescue StandardError => e
       warn "[file-to-s3] #{e.class}: #{e.message}"
-      error(nil, -32603, e.message)
+      error(id, -32603, e.message)
     end
 
     def handle(message)

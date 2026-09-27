@@ -41,10 +41,24 @@ assert_file_is() {
   [ "$got" = "$want" ] || fail "expected $path to hold '$want', got '$got'"
 }
 
+# A stand-in claude CLI: logs each call into the fake HOME and remembers a
+# registration, so `mcp get` answers like the real one after `mcp add`.
+fakebin="$work/bin"
+mkdir -p "$fakebin"
+cat >"$fakebin/claude" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"$HOME/claude-calls.log"
+case "$1 $2" in
+  "mcp get") [ -e "$HOME/mcp-registered" ] ;;
+  "mcp add") : >"$HOME/mcp-registered" ;;
+esac
+EOF
+chmod +x "$fakebin/claude"
+
 # The install dir is hardcoded to $HOME/.claude, so a fake HOME is what isolates
 # a test run. CLAUDE_CONFIG_DIR is set here too, to prove it is ignored.
 run() {
-  HOME="$1" CLAUDE_CONFIG_DIR="$work/ignored" "$SCRIPT"
+  HOME="$1" CLAUDE_CONFIG_DIR="$work/ignored" PATH="$fakebin:$PATH" "$SCRIPT"
 }
 
 # Each case gets its own fake home; this is the config dir inside it.
@@ -110,5 +124,21 @@ got=$(jq -r '.statusLine.command' "$(cfg "$foreign")/settings.json")
 [ "$got" = "bash ~/.claude/statusline-command.sh" ] || fail "statusLine not overridden, got $got"
 got=$(jq -r '.keep' "$(cfg "$foreign")/settings.json")
 [ "$got" = "me" ] || fail "unrelated settings key was lost"
+
+# The file-to-s3 MCP is registered at user scope, exactly once.
+mcphome="$work/mcphome"
+mkdir -p "$mcphome"
+output=$(run "$mcphome")
+assert_contains "mcp: file-to-s3 registered" "$output"
+assert_contains "mcp add --scope user file-to-s3 -- ruby $ROOT_DIR/mcp/file-to-s3/server.rb" "$(cat "$mcphome/claude-calls.log")"
+output=$(run "$mcphome")
+assert_contains "mcp: file-to-s3 already registered" "$output"
+[ "$(grep -c 'mcp add' "$mcphome/claude-calls.log")" = 1 ] || fail "expected exactly one mcp add"
+
+# Without the claude CLI the step is skipped, not fatal.
+noclaude="$work/noclaude"
+mkdir -p "$noclaude"
+output=$(HOME="$noclaude" CLAUDE_BIN="$work/missing-claude" "$SCRIPT")
+assert_contains "mcp: skipped (claude not installed)" "$output"
 
 printf 'ok\n'

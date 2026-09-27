@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Symlink this repo's skills/, rules/ and statusline script into ~/.claude so a
-# fresh machine picks them up, and register the status line in settings.json.
+# fresh machine picks them up, register the status line in settings.json, and
+# register the file-to-s3 MCP with the claude CLI.
 # Idempotent: re-running is a no-op. This repo is the source of truth, so
 # anything already sitting at a destination is overridden -- a real file or
 # directory is moved aside to <name>.bak first, a stray symlink is just redone.
@@ -114,6 +115,26 @@ register_statusline() {
   echo "statusLine: registered in settings.json"
 }
 
+# User scope, so every project on this machine gets it. The command points at
+# this checkout: moving the repo means `claude mcp remove file-to-s3 -s user`
+# and re-running this script. CLAUDE_BIN exists for the tests.
+register_mcp() {
+  local claude_bin=${CLAUDE_BIN:-claude}
+
+  if ! command -v "$claude_bin" >/dev/null 2>&1; then
+    echo "mcp: skipped (claude not installed)"
+    return 0
+  fi
+
+  if "$claude_bin" mcp get file-to-s3 >/dev/null 2>&1; then
+    echo "mcp: file-to-s3 already registered"
+    return 0
+  fi
+
+  "$claude_bin" mcp add --scope user file-to-s3 -- ruby "$repo_root/mcp/file-to-s3/server.rb" >/dev/null
+  echo "mcp: file-to-s3 registered"
+}
+
 echo "installing into $claude_dir"
 echo
 
@@ -121,6 +142,7 @@ link_dir skills
 link_dir rules
 link_statusline
 register_statusline
+register_mcp
 
 echo
 echo "$linked linked, $replaced replaced."

@@ -140,14 +140,14 @@ got=$(jq -r '.statusLine.command' "$(cfg "$foreign")/settings.json")
 got=$(jq -r '.keep' "$(cfg "$foreign")/settings.json")
 [ "$got" = "me" ] || fail "unrelated settings key was lost"
 
-# The file-to-s3 MCP is registered at user scope, exactly once.
+# The file_server MCP is registered at user scope, exactly once.
 mcphome="$work/mcphome"
 mkdir -p "$mcphome"
 output=$(run "$mcphome")
-assert_contains "mcp: file-to-s3 registered" "$output"
-assert_contains "mcp add --scope user file-to-s3 -- ruby $ROOT_DIR/mcp/file-to-s3/server.rb" "$(cat "$mcphome/claude-calls.log")"
+assert_contains "mcp: file_server registered" "$output"
+assert_contains "mcp add --scope user file_server -- ruby $ROOT_DIR/mcp/file_server/server.rb" "$(cat "$mcphome/claude-calls.log")"
 output=$(run "$mcphome")
-assert_contains "mcp: file-to-s3 already registered" "$output"
+assert_contains "mcp: file_server already registered" "$output"
 [ "$(grep -c 'mcp add' "$mcphome/claude-calls.log")" = 1 ] || fail "expected exactly one mcp add"
 
 # Without the claude CLI the step is skipped, not fatal.

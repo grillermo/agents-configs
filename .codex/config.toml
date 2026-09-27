@@ -12,7 +12,7 @@ trust_level = "trusted"
 [projects."/Users/grillermo/c"]
 trust_level = "trusted"
 
-[projects."/Users/grillermo/c/file-to-s3"]
+[projects."/Users/grillermo/c/file_server"]
 trust_level = "trusted"
 
 [projects."/Users/grillermo/c/read-it-soon"]

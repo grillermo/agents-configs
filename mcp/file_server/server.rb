@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Local stdio MCP server that uploads files to file_to_s3 (files.chiq.me).
+# Local stdio MCP server that uploads files to file_server (files.chiq.me).
 # Ruby stdlib only, so it runs on any machine with Ruby 3 — including over SSH.
 # Login: the server posts a one-time code to Slack #otp, the user reads it to
 # Claude, and the code is exchanged for a token that never expires.
@@ -15,19 +15,19 @@ require "uri"
 
 module FileToS3Mcp
   PROTOCOL_VERSION = "2025-06-18"
-  NOT_LOGGED_IN = "Not logged in to file_to_s3. Call file_to_s3_login, ask the user for the " \
-                  "6-digit code posted to Slack #otp, then call file_to_s3_verify with it."
+  NOT_LOGGED_IN = "Not logged in to file_server. Call file_server_login, ask the user for the " \
+                  "6-digit code posted to Slack #otp, then call file_server_verify with it."
 
   TOOLS = [
     {
-      name: "file_to_s3_login",
-      description: "Start logging in to file_to_s3: posts a 6-digit one-time code to the user's " \
-                   "Slack #otp channel. Then ask the user for the code and call file_to_s3_verify.",
+      name: "file_server_login",
+      description: "Start logging in to file_server: posts a 6-digit one-time code to the user's " \
+                   "Slack #otp channel. Then ask the user for the code and call file_server_verify.",
       inputSchema: { type: "object", properties: {} }
     },
     {
-      name: "file_to_s3_verify",
-      description: "Finish logging in to file_to_s3 with the 6-digit code the user read from " \
+      name: "file_server_verify",
+      description: "Finish logging in to file_server with the 6-digit code the user read from " \
                    "Slack #otp. Saves a token on this machine that never expires.",
       inputSchema: {
         type: "object",
@@ -37,7 +37,7 @@ module FileToS3Mcp
     },
     {
       name: "upload_file",
-      description: "Upload a local file (max 25 MB) to file_to_s3 and return its public URL. " \
+      description: "Upload a local file (max 25 MB) to file_server and return its public URL. " \
                    "Without name the URL is unique (UUID-prefixed). With name the file is stored " \
                    "as exactly that name, overwriting the previous upload, so the URL is stable: " \
                    "https://files.chiq.me/files/<name>.",
@@ -56,7 +56,7 @@ module FileToS3Mcp
 
   class ToolError < StandardError; end
 
-  # Talks HTTP to the file_to_s3 app and owns the saved token.
+  # Talks HTTP to the file_server app and owns the saved token.
   class Client
     def initialize(base_url:, token_file:)
       @base_url = base_url.chomp("/")
@@ -65,16 +65,16 @@ module FileToS3Mcp
 
     def request_otp
       response = post("/auth/otp", form: { "label" => Socket.gethostname })
-      raise ToolError, "file_to_s3 refused the login (#{response.code}): #{response.body}" unless response.code == "202"
+      raise ToolError, "file_server refused the login (#{response.code}): #{response.body}" unless response.code == "202"
 
-      "A 6-digit code was posted to Slack #otp. Ask the user for it, then call file_to_s3_verify with the code."
+      "A 6-digit code was posted to Slack #otp. Ask the user for it, then call file_server_verify with the code."
     end
 
     def verify(code)
       response = post("/auth/verify", form: { "code" => code.to_s.strip, "label" => Socket.gethostname })
       unless response.code == "200"
         raise ToolError, "Code rejected (#{response.code}): #{response.body}. " \
-                         "If it expired, call file_to_s3_login for a new one."
+                         "If it expired, call file_server_login for a new one."
       end
 
       token =
@@ -84,7 +84,7 @@ module FileToS3Mcp
           raise ToolError, "Unexpected response from #{@base_url}: #{e.class}: #{e.message}"
         end
       save_token(token)
-      "Logged in to file_to_s3 as #{Socket.gethostname}. The token never expires."
+      "Logged in to file_server as #{Socket.gethostname}. The token never expires."
     end
 
     def upload(path, name = nil)
@@ -166,7 +166,7 @@ module FileToS3Mcp
       id = message["id"] if message.is_a?(Hash)
       handle(message)
     rescue StandardError => e
-      warn "[file-to-s3] #{e.class}: #{e.message}"
+      warn "[file_server] #{e.class}: #{e.message}"
       error(id, -32603, e.message)
     end
 
@@ -189,15 +189,15 @@ module FileToS3Mcp
       {
         protocolVersion: params["protocolVersion"] || PROTOCOL_VERSION,
         capabilities: { tools: {} },
-        serverInfo: { name: "file-to-s3", version: "1.0.0" }
+        serverInfo: { name: "file_server", version: "1.0.0" }
       }
     end
 
     def call_tool(name, arguments)
       text =
         case name
-        when "file_to_s3_login" then @client.request_otp
-        when "file_to_s3_verify" then @client.verify(arguments["code"])
+        when "file_server_login" then @client.request_otp
+        when "file_server_verify" then @client.verify(arguments["code"])
         when "upload_file" then @client.upload(arguments["path"], arguments["name"])
         else raise ToolError, "Unknown tool: #{name}"
         end
@@ -214,8 +214,8 @@ end
 
 if $PROGRAM_NAME == __FILE__
   client = FileToS3Mcp::Client.new(
-    base_url: ENV.fetch("FILE_TO_S3_URL", "https://files.chiq.me"),
-    token_file: ENV.fetch("FILE_TO_S3_TOKEN_FILE") { File.expand_path("~/.config/file-to-s3/token") }
+    base_url: ENV.fetch("FILE_SERVER_URL", "https://files.chiq.me"),
+    token_file: ENV.fetch("FILE_SERVER_TOKEN_FILE") { File.expand_path("~/.config/file_server/token") }
   )
   FileToS3Mcp::Server.new(client).run
 end

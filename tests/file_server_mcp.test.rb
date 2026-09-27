@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Run: ruby tests/file-to-s3-mcp.test.rb
+# Run: ruby tests/file_server-mcp.test.rb
 require "minitest/autorun"
 require "fileutils"
 require "json"
@@ -10,7 +10,7 @@ require "socket"
 require "tmpdir"
 require "uri"
 
-SERVER = File.expand_path("../mcp/file-to-s3/server.rb", __dir__)
+SERVER = File.expand_path("../mcp/file_server/server.rb", __dir__)
 
 # A just-enough HTTP/1.1 server standing in for files.chiq.me. WEBrick is not
 # in Ruby 3's stdlib, so this reads one request per connection by hand.
@@ -50,8 +50,8 @@ end
 
 class FileToS3McpTest < Minitest::Test
   def setup
-    @dir = Dir.mktmpdir("file-to-s3-mcp-")
-    @token_file = File.join(@dir, "config", "file-to-s3", "token")
+    @dir = Dir.mktmpdir("file_server-mcp-")
+    @token_file = File.join(@dir, "config", "file_server", "token")
     @routes = {}
     @fake = FakeFileToS3.new do |request|
       handler = @routes[request[:path].split("?").first]
@@ -68,7 +68,7 @@ class FileToS3McpTest < Minitest::Test
   # --- helpers ---------------------------------------------------------
 
   def raw(input)
-    env = { "FILE_TO_S3_URL" => @url, "FILE_TO_S3_TOKEN_FILE" => @token_file, "HOME" => @dir }
+    env = { "FILE_SERVER_URL" => @url, "FILE_SERVER_TOKEN_FILE" => @token_file, "HOME" => @dir }
     out, err, status = Open3.capture3(env, RbConfig.ruby, SERVER, stdin_data: input)
     assert status.success?, "server exited #{status.exitstatus}: #{err}"
     out.lines.map { |line| JSON.parse(line) }
@@ -109,10 +109,10 @@ class FileToS3McpTest < Minitest::Test
 
     assert_equal [1, 2], responses.map { |response| response["id"] }
     assert_equal "2025-06-18", responses[0]["result"]["protocolVersion"]
-    assert_equal "file-to-s3", responses[0]["result"]["serverInfo"]["name"]
+    assert_equal "file_server", responses[0]["result"]["serverInfo"]["name"]
     assert_equal({ "tools" => {} }, responses[0]["result"]["capabilities"])
     names = responses[1]["result"]["tools"].map { |tool| tool["name"] }
-    assert_equal %w[file_to_s3_login file_to_s3_verify upload_file], names
+    assert_equal %w[file_server_login file_server_verify upload_file], names
     upload = responses[1]["result"]["tools"].find { |tool| tool["name"] == "upload_file" }
     assert_equal %w[path name], upload["inputSchema"]["properties"].keys
     assert_equal %w[path], upload["inputSchema"]["required"]
@@ -139,17 +139,17 @@ class FileToS3McpTest < Minitest::Test
 
   def test_login_requests_an_otp_labelled_with_the_hostname
     @routes["/auth/otp"] = ->(_) { [202, "OTP sent to Slack #otp"] }
-    result = call_tool("file_to_s3_login")
+    result = call_tool("file_server_login")
 
     assert_equal false, result["isError"]
     assert_includes text(result), "Slack #otp"
-    assert_includes text(result), "file_to_s3_verify"
+    assert_includes text(result), "file_server_verify"
     assert_includes @fake.requests.last[:body], URI.encode_www_form(label: Socket.gethostname)
   end
 
   def test_login_failure_is_a_tool_error
     @routes["/auth/otp"] = ->(_) { [503, "OTP delivery not configured"] }
-    result = call_tool("file_to_s3_login")
+    result = call_tool("file_server_login")
 
     assert_equal true, result["isError"]
     assert_includes text(result), "OTP delivery not configured"
@@ -157,7 +157,7 @@ class FileToS3McpTest < Minitest::Test
 
   def test_verify_saves_the_token_privately
     @routes["/auth/verify"] = ->(_) { [200, JSON.generate(token: "fts_abc")] }
-    result = call_tool("file_to_s3_verify", code: " 123456 ")
+    result = call_tool("file_server_verify", code: " 123456 ")
 
     assert_equal false, result["isError"]
     assert_includes @fake.requests.last[:body], "code=123456"
@@ -168,7 +168,7 @@ class FileToS3McpTest < Minitest::Test
 
   def test_rejected_code_writes_no_token
     @routes["/auth/verify"] = ->(_) { [401, "Invalid or expired code"] }
-    result = call_tool("file_to_s3_verify", code: "000000")
+    result = call_tool("file_server_verify", code: "000000")
 
     assert_equal true, result["isError"]
     assert_includes text(result), "Invalid or expired code"
@@ -211,7 +211,7 @@ class FileToS3McpTest < Minitest::Test
     result = call_tool("upload_file", path: write_file("a.txt", "hello"))
 
     assert_equal true, result["isError"]
-    assert_includes text(result), "file_to_s3_login"
+    assert_includes text(result), "file_server_login"
     assert_empty @fake.requests
   end
 
@@ -221,7 +221,7 @@ class FileToS3McpTest < Minitest::Test
     result = call_tool("upload_file", path: write_file("a.txt", "hello"))
 
     assert_equal true, result["isError"]
-    assert_includes text(result), "file_to_s3_login"
+    assert_includes text(result), "file_server_login"
   end
 
   def test_upload_missing_file
@@ -244,7 +244,7 @@ class FileToS3McpTest < Minitest::Test
 
   def test_malformed_verify_response_is_a_tool_error
     @routes["/auth/verify"] = ->(_) { [200, "not json at all"] }
-    response = mcp({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "file_to_s3_verify", arguments: { code: "123456" } } }).first
+    response = mcp({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "file_server_verify", arguments: { code: "123456" } } }).first
 
     assert_equal 9, response["id"]
     assert_nil response["error"]

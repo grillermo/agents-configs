@@ -3,7 +3,9 @@
 # Run: ruby tests/file_server-mcp.test.rb
 require "minitest/autorun"
 require "fileutils"
+require "digest"
 require "json"
+require "openssl"
 require "open3"
 require "rbconfig"
 require "socket"
@@ -58,17 +60,19 @@ class FileToS3McpTest < Minitest::Test
       handler ? handler.call(request) : [404, "Not found"]
     end
     @url = @fake.url
+    @lan_url = "" # keep the real home server out of the tests
   end
 
   def teardown
     @fake.stop
+    @lan&.stop
     FileUtils.remove_entry(@dir)
   end
 
   # --- helpers ---------------------------------------------------------
 
   def raw(input)
-    env = { "FILE_SERVER_URL" => @url, "FILE_SERVER_TOKEN_FILE" => @token_file, "HOME" => @dir }
+    env = { "FILE_SERVER_URL" => @url, "FILE_SERVER_LAN_URL" => @lan_url, "FILE_SERVER_TOKEN_FILE" => @token_file, "HOME" => @dir }
     out, err, status = Open3.capture3(env, RbConfig.ruby, SERVER, stdin_data: input)
     assert status.success?, "server exited #{status.exitstatus}: #{err}"
     out.lines.map { |line| JSON.parse(line) }
@@ -96,6 +100,33 @@ class FileToS3McpTest < Minitest::Test
     path = File.join(@dir, name)
     File.write(path, content)
     path
+  end
+
+  # A sparse file just past the tunnel's cap.
+  def big_file
+    path = File.join(@dir, "big.bin")
+    File.open(path, "wb") { |file| file.truncate(25 * 1024 * 1024 + 1) }
+    path
+  end
+
+  # Answers /health the way file_server does for a token it holds.
+  def proof_for(request, token)
+    params = URI.decode_www_form(URI(request[:path]).query.to_s).to_h
+    digest = Digest::SHA256.hexdigest(token)
+    return nil unless params["token_id"] == digest[0, 16]
+
+    OpenSSL::HMAC.hexdigest("SHA256", digest, "#{params["nonce"]}\n#{request[:headers]["host"]}")
+  end
+
+  def lan_server(holds: "fts_abc", health: nil)
+    @lan = FakeFileToS3.new do |request|
+      case request[:path].split("?").first
+      when "/health" then health&.call(request) || [200, JSON.generate(proof: proof_for(request, holds))]
+      when "/upload" then [200, "https://files.chiq.me/files/uuid-a.txt"]
+      else [404, "Not found"]
+      end
+    end
+    @lan_url = @lan.url
   end
 
   # --- protocol ----------------------------------------------------------
@@ -261,6 +292,90 @@ class FileToS3McpTest < Minitest::Test
 
     assert_equal true, result["isError"]
     assert_includes text(result), "Could not reach"
+  end
+
+  # --- LAN ---------------------------------------------------------------
+
+  def test_upload_goes_to_the_lan_when_file_server_answers_there
+    logged_in
+    lan_server
+    result = call_tool("upload_file", path: write_file("a.txt", "hello"))
+
+    assert_equal false, result["isError"], text(result)
+    assert_equal "https://files.chiq.me/files/uuid-a.txt", text(result)
+    assert_equal ["/health", "/upload"], @lan.requests.map { |request| request[:path].split("?").first }
+    assert_nil @lan.requests.first[:headers]["authorization"]
+    assert_empty @fake.requests
+  end
+
+  def test_login_without_a_token_goes_through_the_tunnel
+    lan_server
+    @routes["/auth/otp"] = ->(_) { [202, "OTP sent to Slack #otp"] }
+    call_tool("file_server_login")
+
+    assert_empty @lan.requests
+    assert_equal "/auth/otp", @fake.requests.last[:path]
+  end
+
+  def assert_lan_refused
+    logged_in
+    @routes["/upload"] = ->(_) { [200, "https://files.example/files/uuid-a.txt"] }
+    result = call_tool("upload_file", path: write_file("a.txt", "hello"))
+
+    assert_equal false, result["isError"], text(result)
+    assert_equal ["/health"], @lan.requests.map { |request| request[:path].split("?").first }
+    assert_equal "/upload", @fake.requests.last[:path]
+  end
+
+  def test_a_different_device_on_the_lan_address_never_sees_the_token
+    lan_server(health: ->(_) { [200, "<html>router login</html>"] })
+    assert_lan_refused
+  end
+
+  def test_a_device_that_only_knows_the_service_name_is_refused
+    lan_server(health: ->(_) { [200, JSON.generate(service: "chiq-file-server")] })
+    assert_lan_refused
+  end
+
+  def test_a_server_holding_a_different_token_is_refused
+    lan_server(holds: "fts_someone_else")
+    assert_lan_refused
+  end
+
+  def test_a_proof_relayed_for_another_host_is_refused
+    lan_server(health: lambda { |request|
+      relayed = request.merge(headers: request[:headers].merge("host" => "files.chiq.me"))
+      [200, JSON.generate(proof: proof_for(relayed, "fts_abc"))]
+    })
+    assert_lan_refused
+  end
+
+  def test_an_unreachable_lan_falls_back_to_the_tunnel
+    logged_in
+    @lan_url = "http://127.0.0.1:1"
+    @routes["/upload"] = ->(_) { [200, "https://files.example/files/uuid-a.txt"] }
+    result = call_tool("upload_file", path: write_file("a.txt", "hello"))
+
+    assert_equal false, result["isError"], text(result)
+    assert_equal "/upload", @fake.requests.last[:path]
+  end
+
+  def test_files_over_25_mb_are_refused_through_the_tunnel
+    logged_in
+    result = call_tool("upload_file", path: big_file)
+
+    assert_equal true, result["isError"]
+    assert_includes text(result), "25 MB"
+    assert_empty @fake.requests
+  end
+
+  def test_files_over_25_mb_upload_on_the_lan
+    logged_in
+    lan_server
+    result = call_tool("upload_file", path: big_file)
+
+    assert_equal false, result["isError"], text(result)
+    assert_operator @lan.requests.last[:body].bytesize, :>, 25 * 1024 * 1024
   end
 
   def test_unknown_tool_is_a_tool_error

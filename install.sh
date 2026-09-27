@@ -5,6 +5,7 @@
 # Idempotent: re-running is a no-op. This repo is the source of truth, so
 # anything already sitting at a destination is overridden -- a real file or
 # directory is moved aside to <name>.bak first, a stray symlink is just redone.
+# A skill/rule this repo used to symlink but no longer has is unlinked too.
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -17,6 +18,7 @@ mkdir -p "$claude_dir"
 
 linked=0
 replaced=0
+removed=0
 
 link_one() {
   local src=$1
@@ -58,6 +60,36 @@ link_one() {
   linked=$((linked + 1))
 }
 
+# Removes a dest_dir entry that is our own symlink into src_dir but whose
+# source no longer exists there -- a skill/rule deleted from the repo since
+# the last install. Never touches a real file/directory, or a symlink this
+# script didn't create (someone else's stuff at that name is left alone).
+prune_stale() {
+  local src_dir=$1
+  local dest_dir=$2
+
+  [ -d "$dest_dir" ] || return 0
+
+  local existing=("$dest_dir"/*)
+  # -e alone is wrong here: it follows symlinks, so a broken one (exactly
+  # what this function looks for) reads as "empty dir" and short-circuits.
+  [ -e "${existing[0]}" ] || [ -L "${existing[0]}" ] || return 0
+
+  local dest target
+  for dest in "${existing[@]}"; do
+    [ -L "$dest" ] || continue
+    target=$(readlink "$dest")
+    case "$target" in
+      "$src_dir"/*)
+        [ -e "$target" ] && continue
+        rm "$dest"
+        echo "  removed $(basename "$dest") (no longer in repo)"
+        removed=$((removed + 1))
+        ;;
+    esac
+  done
+}
+
 link_dir() {
   local kind=$1
   local src_dir="$repo_root/$kind"
@@ -76,6 +108,8 @@ link_dir() {
   for src in "${entries[@]}"; do
     link_one "$src" "$dest_dir/$(basename "$src")"
   done
+
+  prune_stale "$src_dir" "$dest_dir"
 }
 
 # The status line lives at the top level of ~/.claude, not in a subdirectory,
@@ -145,4 +179,4 @@ register_statusline
 register_mcp
 
 echo
-echo "$linked linked, $replaced replaced."
+echo "$linked linked, $replaced replaced. $removed removed."

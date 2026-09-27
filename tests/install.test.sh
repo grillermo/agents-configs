@@ -114,6 +114,21 @@ run "$dirdest" >/dev/null
 assert_link_to "$(cfg "$dirdest")/skills/$skill_name" "$ROOT_DIR/skills/$skill_name"
 assert_file_is "$(cfg "$dirdest")/skills/$skill_name.bak/leftover.txt" "stale"
 
+# A skill this repo used to symlink but has since deleted is unlinked too.
+pruned="$work/pruned"
+mkdir -p "$(cfg "$pruned")/skills"
+ln -s "$ROOT_DIR/skills/does-not-exist-anymore" "$(cfg "$pruned")/skills/does-not-exist-anymore"
+output=$(run "$pruned")
+assert_contains "removed does-not-exist-anymore (no longer in repo)" "$output"
+[ -e "$(cfg "$pruned")/skills/does-not-exist-anymore" ] && fail "expected the stale symlink to be gone"
+
+# A symlink at that name pointing outside this repo is left alone -- it isn't ours.
+foreign_link="$work/foreign_link"
+mkdir -p "$(cfg "$foreign_link")/skills"
+ln -s "$work/elsewhere.sh" "$(cfg "$foreign_link")/skills/not-ours"
+run "$foreign_link" >/dev/null
+assert_link_to "$(cfg "$foreign_link")/skills/not-ours" "$work/elsewhere.sh"
+
 # A foreign statusLine command in settings.json is rewritten to this repo's.
 foreign="$work/foreign"
 mkdir -p "$(cfg "$foreign")"

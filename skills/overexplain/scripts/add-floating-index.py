@@ -5,7 +5,7 @@ Usage: add-floating-index.py path/to/page.html
 
 Inserts the CSS before the last </style> in <head> (or adds a <style> block if the
 page has none) and the JS as the last <script> before </body>. Self-contained: the
-page keeps working from file:// and inside a gist. Idempotent — running it twice
+page keeps working from file:// and when served from file_server. Idempotent — running it twice
 replaces the previously injected blocks instead of duplicating them.
 """
 

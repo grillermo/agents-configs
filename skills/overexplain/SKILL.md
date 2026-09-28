@@ -3,7 +3,7 @@ name: overexplain
 description: >
   Produce a human-friendly, over-explained walkthrough of a codebase target (a feature, file,
   flow, concept, service, endpoint, bug, PR) and publish it as a standalone HTML page, uploaded
-  as a secret gist and opened via a shareable gistpreview link. Assumes the reader knows nothing
+  to file_server (files.chiq.me) and opened via its shareable URL. Assumes the reader knows nothing
   about the codebase or its domain. Use only when the user explicitly invokes /overexplain.
 ---
 
@@ -133,7 +133,7 @@ Requirements for the HTML file:
   scrollspy are prewritten skill assets — never author them yourself.** Write only the
   `<nav class="toc">` markup (one `<li>` per `<h2>`, in document order), then inline the rest with
   `python3 ~/.claude/skills/overexplain/scripts/add-floating-index.py "{title-in-kebab-case}.html"`
-  once the page is otherwise finished, and before the gist upload. See
+  once the page is otherwise finished, and before the upload. See
   `references/floating-index.md` for the markup shape and what the assets assume.
 - Every section the index links to needs a stable `id` on its `<h2>`, so deep links like
   `…#identity` work and the highlight has something to anchor to.
@@ -143,16 +143,22 @@ Requirements for the HTML file:
 Consult the `frontend-design` skill if you want a stronger visual result, and the `dataviz`
 skill if the explanation contains charts.
 
-## 4. Publish to a secret gist
+## 4. Upload to file_server
 
-Upload the finished HTML as a **secret** gist so it can be shared and rendered:
+Upload the finished HTML with the `upload_file` tool from the `file_server` MCP server, passing
+the absolute path of `{title-in-kebab-case}.html` and **no `name`**:
 
-```bash
-gh gist create --secret --desc "{Title} — overexplained" "{title-in-kebab-case}.html"
+```
+upload_file(path: "/abs/path/to/{title-in-kebab-case}.html")
 ```
 
-`gh gist create` prints the gist URL; the `{GIST_ID}` is the last path segment
-(`https://gist.github.com/{user}/{GIST_ID}`). Capture it — don't guess it.
+Leaving out `name` gives the file a UUID-prefixed URL that nobody can guess — the page is public
+to anyone holding the link, but not discoverable. Passing a `name` would make the URL guessable
+and would overwrite any earlier page with that name, so don't. The tool returns the public URL
+(`https://files.chiq.me/files/{uuid}-{title-in-kebab-case}.html`). Capture it — don't guess it.
+
+If the tool says you're not logged in, call `file_server_login`, ask the user for the 6-digit code
+it posts to Slack #otp, call `file_server_verify` with it, then retry the upload.
 
 Internal source code in the page is fine — upload it. The **only** reason to skip this step is
 if the HTML contains a live credential value: an API key, token, password, private key, or
@@ -160,26 +166,25 @@ connection string with real secrets in it. Variable names, key *names*, `ENV['ST
 references, and placeholder/example values are not secrets — those upload normally.
 
 If you do find a real credential, don't upload. Strip it from the HTML and upload the cleaned
-version, or if it's load-bearing to the explanation, skip the gist, tell the user exactly which
+version, or if it's load-bearing to the explanation, skip the upload, tell the user exactly which
 value stopped you, and open the local file instead:
 
 ```bash
 open "{title-in-kebab-case}.html"
 ```
 
-## 5. Open the shareable preview
+## 5. Open the shareable page
 
-gistpreview renders the gist's HTML instead of showing it as source. Open that, **not** the
-local file:
+file_server serves `.html` as `text/html`, so the URL renders the page directly. Open that,
+**not** the local file:
 
 ```bash
-open "https://gistpreview.github.io/?{GIST_ID}"
+open "{URL returned by upload_file}"
 ```
 
-If the gist holds more than one file, or the file isn't named `index.html` and gistpreview
-doesn't pick it up, append the filename: `https://gistpreview.github.io/?{GIST_ID}/{filename}.html`.
-Verify the URL actually renders before handing it over.
+Verify the URL actually renders (e.g. `curl -sI` returns `200` and `content-type: text/html`)
+before handing it over.
 
-Then tell the user, in 2–3 lines: which repo(s) you read, the local file path, the gistpreview
+Then tell the user, in 2–3 lines: which repo(s) you read, the local file path, the file_server
 link, and the single most important thing they should know about the target. Don't restate the
 document.

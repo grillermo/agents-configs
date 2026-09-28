@@ -36,8 +36,8 @@ python3 ~/.claude/skills/overexplain/scripts/add-floating-index.py "{title-in-ke
 ```
 
 The CSS goes before the page's last `</style>`, the JS as the last `<script>` before `</body>` —
-both inlined, so the page stays a single self-contained file that works from `file://` and inside a
-gist. Re-running replaces the injected blocks rather than duplicating them, so it's safe to run
+both inlined, so the page stays a single self-contained file that works from `file://` and when
+served from file_server. Re-running replaces the injected blocks rather than duplicating them, so it's safe to run
 again after editing the page. It warns if it can't find a `<nav class="toc">`.
 
 ## 3. Check it

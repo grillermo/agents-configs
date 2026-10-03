@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Symlink this repo's skills/, rules/ and statusline script into ~/.claude so a
 # fresh machine picks them up, register the status line in settings.json, and
-# register the file_server MCP with the claude CLI.
+# register the file_server MCP and third-party plugins with the claude CLI.
 # Idempotent: re-running is a no-op. This repo is the source of truth, so
 # anything already sitting at a destination is overridden -- a real file or
 # directory is moved aside to <name>.bak first, a stray symlink is just redone.
@@ -169,6 +169,43 @@ register_mcp() {
   echo "mcp: file_server registered"
 }
 
+# Third-party plugins every machine should have, as "<plugin>@<marketplace>
+# <github owner/repo of the marketplace>". Installed at user scope; one already
+# installed is left alone, so a version bump comes from `claude plugin update`.
+plugins=(
+  "crayon@cc-crayon jonpojonpo/cc-crayon"
+)
+
+register_plugins() {
+  local claude_bin=${CLAUDE_BIN:-claude}
+
+  if ! command -v "$claude_bin" >/dev/null 2>&1; then
+    echo "plugins: skipped (claude not installed)"
+    return 0
+  fi
+
+  local installed marketplaces entry id repo marketplace
+  installed=$("$claude_bin" plugin list 2>/dev/null || true)
+  marketplaces=$("$claude_bin" plugin marketplace list 2>/dev/null || true)
+
+  for entry in "${plugins[@]}"; do
+    id=${entry% *}
+    repo=${entry#* }
+    marketplace=${id#*@}
+
+    if grep -qF -- "$id" <<<"$installed"; then
+      echo "plugin: $id already installed"
+      continue
+    fi
+
+    if ! grep -qE -- "❯ $marketplace\$" <<<"$marketplaces"; then
+      "$claude_bin" plugin marketplace add "$repo" >/dev/null
+    fi
+    "$claude_bin" plugin install --scope user "$id" >/dev/null
+    echo "plugin: $id installed"
+  done
+}
+
 echo "installing into $claude_dir"
 echo
 
@@ -177,6 +214,7 @@ link_dir rules
 link_statusline
 register_statusline
 register_mcp
+register_plugins
 
 echo
 echo "$linked linked, $replaced replaced. $removed removed."

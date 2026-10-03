@@ -51,6 +51,13 @@ printf '%s\n' "$*" >>"$HOME/claude-calls.log"
 case "$1 $2" in
   "mcp get") [ -e "$HOME/mcp-registered" ] ;;
   "mcp add") : >"$HOME/mcp-registered" ;;
+  "plugin list") cat "$HOME/plugins-installed" 2>/dev/null || true ;;
+  "plugin install") printf '  ❯ %s\n' "$5" >>"$HOME/plugins-installed" ;;
+  "plugin marketplace")
+    case "$3" in
+      list) cat "$HOME/marketplaces" 2>/dev/null || true ;;
+      add) printf '  ❯ %s\n' "${4#*/}" >>"$HOME/marketplaces" ;;
+    esac ;;
 esac
 EOF
 chmod +x "$fakebin/claude"
@@ -150,10 +157,30 @@ output=$(run "$mcphome")
 assert_contains "mcp: file_server already registered" "$output"
 [ "$(grep -c 'mcp add' "$mcphome/claude-calls.log")" = 1 ] || fail "expected exactly one mcp add"
 
+# crayon's marketplace is added and the plugin installed at user scope, once.
+pluginhome="$work/pluginhome"
+mkdir -p "$pluginhome"
+output=$(run "$pluginhome")
+assert_contains "plugin: crayon@cc-crayon installed" "$output"
+calls=$(cat "$pluginhome/claude-calls.log")
+assert_contains "plugin marketplace add jonpojonpo/cc-crayon" "$calls"
+assert_contains "plugin install --scope user crayon@cc-crayon" "$calls"
+output=$(run "$pluginhome")
+assert_contains "plugin: crayon@cc-crayon already installed" "$output"
+[ "$(grep -c 'plugin install' "$pluginhome/claude-calls.log")" = 1 ] || fail "expected exactly one plugin install"
+
+# A marketplace that is already configured is not added again.
+knownmkt="$work/knownmkt"
+mkdir -p "$knownmkt"
+printf '  ❯ cc-crayon\n' >"$knownmkt/marketplaces"
+run "$knownmkt" >/dev/null
+grep -q 'marketplace add' "$knownmkt/claude-calls.log" && fail "expected no marketplace add"
+
 # Without the claude CLI the step is skipped, not fatal.
 noclaude="$work/noclaude"
 mkdir -p "$noclaude"
 output=$(HOME="$noclaude" CLAUDE_BIN="$work/missing-claude" "$SCRIPT")
 assert_contains "mcp: skipped (claude not installed)" "$output"
+assert_contains "plugins: skipped (claude not installed)" "$output"
 
 printf 'ok\n'

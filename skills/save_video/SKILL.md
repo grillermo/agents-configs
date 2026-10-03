@@ -5,8 +5,10 @@ description: Save a video to the user's PatataTube server (their self-hosted "wa
 
 # save_video
 
-Uploads a video to PatataTube (`~/c/patatatube`, served by Caddy on
-`http://127.0.0.1:3050`). The server downloads URLs itself, in the background,
+Uploads a video to PatataTube (`~/c/patatatube`, served by Caddy on `:3050`).
+The script picks the server itself: the first local address that answers
+(`http://127.0.0.1:3050`, then `http://192.168.1.1:3050`), otherwise the
+remote `https://videos.chiq.me`. It prints `save_video: using <url>` to stderr. The server downloads URLs itself, in the background,
 and re-encodes everything for iOS, so a successful call means *queued*, not
 *ready*.
 
@@ -42,14 +44,21 @@ and re-encodes everything for iOS, so a successful call means *queued*, not
 ## Notes
 
 - The token is `UPLOAD_TOKEN` from `/Users/grillermo/c/patatatube/.env`; the
-  script never prints it. Override with `PATATATUBE_ENV_FILE`, and the server
-  with `PATATATUBE_URL`.
+  script never prints it. Override with `PATATATUBE_ENV_FILE`. Force a server
+  with `PATATATUBE_URL` (skips detection), or change the candidates with
+  `PATATATUBE_LOCAL_URLS` (space-separated) and `PATATATUBE_REMOTE_URL`.
 - A YouTube video already downloaded is not fetched again — the server moves
   the existing one into the requested group.
 - A failed download deletes its row instead of marking it failed, so the only
   trace is in `~/c/patatatube/log/backend.log`.
 - An unknown or ambiguous group exits `65` and lists every group as
   `name (label)` — show that list to the user rather than picking one.
+- `PATATATUBE_URL` on a loopback/private host (`127.0.0.1`, `192.168.x.x`,
+  `10.x`, `172.16–31.x`, `localhost`, `*.local`, `*.lan`) is treated as local;
+  anything else (e.g. `https://videos.chiq.me`) is remote, behind Cloudflare,
+  and local files over 25 MB are refused with exit `73`. Tell the user to use
+  a local URL for those. URL uploads are unaffected — the server downloads them.
 - Exit codes: `64` usage, `65` group not found/ambiguous, `66` file or
-  credentials missing, `69` curl/python3 missing or server unreachable;
+  credentials missing, `69` curl/python3 missing or server unreachable,
+  `73` file too large for a remote server;
   otherwise curl's exit status (`22` for an HTTP error, body on stderr).

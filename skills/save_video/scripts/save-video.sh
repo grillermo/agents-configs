@@ -7,10 +7,19 @@
 # an id through GET /api/groups. The token comes from the patatatube .env
 # (UPLOAD_TOKEN) and reaches curl through a config on stdin, so it never shows
 # up in `ps` or in output.
+#
+# Without PATATATUBE_URL the server is picked automatically: the first of
+# LOCAL_URLS that answers within a second, else REMOTE_URL. A private/loopback
+# host talks to the server directly; any other host (videos.chiq.me) goes
+# through Cloudflare, which caps the request body, so files over
+# REMOTE_MAX_BYTES are refused before uploading.
 set -eu
 
-PATATATUBE_URL=${PATATATUBE_URL:-http://127.0.0.1:3050}
+PATATATUBE_URL=${PATATATUBE_URL:-}
+LOCAL_URLS=${PATATATUBE_LOCAL_URLS:-"http://127.0.0.1:3050 http://192.168.1.1:3050"}
+REMOTE_URL=${PATATATUBE_REMOTE_URL:-https://videos.chiq.me}
 PATATATUBE_ENV_FILE=${PATATATUBE_ENV_FILE:-/Users/grillermo/c/patatatube/.env}
+REMOTE_MAX_BYTES=$((25 * 1000 * 1000))
 GROUP=
 DRY_RUN=0
 
@@ -54,6 +63,35 @@ case $TARGET in
     KIND=file
     ;;
 esac
+
+if [ -z "$PATATATUBE_URL" ]; then
+  for url in $LOCAL_URLS; do
+    # Any HTTP answer counts; curl prints 000 when nothing is listening.
+    code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 1 -m 2 "$url/" || true)
+    if [ "$code" != 000 ]; then
+      PATATATUBE_URL=$url
+      break
+    fi
+  done
+  PATATATUBE_URL=${PATATATUBE_URL:-$REMOTE_URL}
+  printf 'save_video: using %s\n' "$PATATATUBE_URL" >&2
+fi
+
+# Host of PATATATUBE_URL: drop scheme, path, userinfo and port.
+host=${PATATATUBE_URL#*://}
+host=${host%%/*}
+host=${host##*@}
+host=${host%:*}
+case $host in
+  localhost|127.*|10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|*.local|*.lan) REMOTE=0 ;;
+  *) REMOTE=1 ;;
+esac
+
+if [ "$KIND" = file ] && [ "$REMOTE" -eq 1 ]; then
+  size=$(wc -c < "$TARGET" | tr -d ' ')
+  [ "$size" -le "$REMOTE_MAX_BYTES" ] \
+    || die 73 "$TARGET is $((size / 1000 / 1000)) MB; $PATATATUBE_URL is remote (Cloudflare) and accepts at most $((REMOTE_MAX_BYTES / 1000 / 1000)) MB, and no local server ($LOCAL_URLS) answered. Upload it from the home network."
+fi
 
 [ -f "$PATATATUBE_ENV_FILE" ] || die 66 "env file not found: $PATATATUBE_ENV_FILE"
 TOKEN=$(sed -n 's/^[[:space:]]*UPLOAD_TOKEN=//p' "$PATATATUBE_ENV_FILE" | tail -1 | tr -d '"'"'"'\r')
